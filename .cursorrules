@@ -1,0 +1,320 @@
+# Browser-Use 开发规则
+这是 Browser-Use 库的完整开发指南，用于指导AI编程助手正确使用该库。
+
+## 核心架构
+```
+Browser (BrowserSession) → Page → Element
+                      ↓
+                    Mouse
+                      ↓
+                AI Features (LLM)
+```
+
+### 核心类
+* **Browser** (别名: **BrowserSession**): 主会话管理器
+* **Page**: 代表浏览器标签页/iframe
+* **Element**: 单个DOM元素操作
+* **Mouse**: 基于坐标的鼠标操作
+
+## Browser (BrowserSession)
+主浏览器会话管理器。
+
+### 关键方法
+```python
+from browser_use import Browser
+browser = Browser()
+await browser.start()
+
+# 页面管理
+page = await browser.new_page("https://example.com")
+pages = await browser.get_pages()
+current = await browser.get_current_page()
+await browser.close_page(page)
+
+# 停止浏览器会话
+await browser.stop()
+```
+
+### 构造函数参数
+请参考 [Browser 参数文档](https://docs.browser-use.com/customize/browser/all-parameters) 获取完整配置选项。
+
+## Page
+浏览器标签页/iframe，用于页面级操作。
+
+### 导航
+* `goto(url: str)` - 导航到 URL
+* `go_back()`, `go_forward()`, `reload()` - 历史记录导航
+
+### 元素查找
+* `get_elements_by_css_selector(selector: str) -> list[Element]` - CSS 选择器
+* `get_element(backend_node_id: int) -> Element` - 通过 CDP 节点 ID
+* `get_element_by_prompt(prompt: str, llm) -> Element | None` - AI 驱动查找
+* `must_get_element_by_prompt(prompt: str, llm) -> Element` - AI 查找（未找到时抛出异常）
+
+### JavaScript 和控制
+* `evaluate(page_function: str, *args) -> str` - 执行 JS（箭头函数格式）
+* `press(key: str)` - 发送键盘输入（"Enter", "Control+A"）
+* `set_viewport_size(width: int, height: int)` - 设置视口
+* `screenshot(format='jpeg', quality=None) -> str` - 截图
+
+### 信息
+* `get_url() -> str`, `get_title() -> str` - 页面信息
+* `mouse -> Mouse` - 获取鼠标接口
+
+### AI 功能
+* `extract_content(prompt: str, structured_output: type[T], llm) -> T` - 提取数据
+
+## Element
+单个 DOM 元素交互。
+
+### 交互
+* `click(button='left', click_count=1, modifiers=None)` - 点击元素
+* `fill(text: str, clear=True)` - 填充输入框
+* `hover()`, `focus()` - 鼠标/焦点操作
+* `check()` - 切换复选框/单选按钮
+* `select_option(values: str | list[str])` - 选择下拉选项
+* `drag_to(target: Element | Position)` - 拖放
+
+### 属性
+* `get_attribute(name: str) -> str | None` - 获取属性
+* `get_bounding_box() -> BoundingBox | None` - 位置/大小
+* `get_basic_info() -> ElementInfo` - 完整元素信息
+* `screenshot(format='jpeg') -> str` - 元素截图
+
+## Mouse
+基于坐标的鼠标操作。
+
+### 操作
+* `click(x: int, y: int, button='left', click_count=1)` - 在坐标处点击
+* `move(x: int, y: int, steps=1)` - 移动鼠标
+* `down(button='left')`, `up(button='left')` - 按下/释放按钮
+* `scroll(x=0, y=0, delta_x=None, delta_y=None)` - 在坐标处滚动
+
+## 基本用法示例
+### 页面管理
+```python
+from browser_use import Browser
+browser = Browser()
+await browser.start()
+
+# 创建页面
+page = await browser.new_page()  # 空白标签页
+page = await browser.new_page("https://example.com")  # 带 URL
+
+# 获取所有页面
+pages = await browser.get_pages()
+current = await browser.get_current_page()
+
+# 关闭页面
+await browser.close_page(page)
+await browser.stop()
+```
+
+### 元素查找与交互
+```python
+page = await browser.new_page('https://github.com')
+# CSS 选择器（立即返回）
+elements = await page.get_elements_by_css_selector("input[type='text']")
+buttons = await page.get_elements_by_css_selector("button.submit")
+
+# 元素操作
+await elements[0].click()
+await elements[0].fill("Hello World")
+await elements[0].hover()
+
+# 页面操作
+await page.press("Enter")
+screenshot = await page.screenshot()
+```
+
+### LLM 驱动功能
+```python
+from browser_use.llm.openai.chat import ChatOpenAI
+from pydantic import BaseModel
+llm = ChatOpenAI(api_key="your-api-key")
+# 使用自然语言查找元素
+button = await page.get_element_by_prompt("登录按钮", llm=llm)
+await button.click()
+# 提取结构化数据
+class ProductInfo(BaseModel):
+    name: str
+    price: float
+product = await page.extract_content(
+    "提取产品名称和价格",
+    ProductInfo,
+    llm=llm
+)
+```
+
+### JavaScript 执行
+```python
+# 简单的 JavaScript 评估
+title = await page.evaluate('() => document.title')
+# 带参数的 JavaScript
+result = await page.evaluate('(x, y) => x + y', 10, 20)
+# 复杂操作
+stats = await page.evaluate('''() => ({
+    url: location.href,
+    links: document.querySelectorAll('a').length
+})''')
+```
+
+### 鼠标操作
+```python
+mouse = await page.mouse
+# 在坐标处点击
+await mouse.click(x=100, y=200)
+# 拖放
+await mouse.down()
+await mouse.move(x=500, y=600)
+await mouse.up()
+# 滚动
+await mouse.scroll(x=0, y=100, delta_y=-500)
+```
+
+## Agent 配置参数
+### 核心设置
+* `tools`: 代理可以调用的[工具](https://docs.browser-use.com/customize/tools/available)注册表。[示例](https://docs.browser-use.com/customize/tools/basics)
+* `skills` (或 `skill_ids`): 要加载的技能 ID 列表（例如 `['skill-uuid']` 或 `['*']` 表示全部）。需要 `BROWSER_USE_API_KEY`。[文档](https://docs.browser-use.com/customize/skills/basics)
+* `browser`: 浏览器对象，可以指定浏览器设置
+* `output_model_schema`: 用于结构化输出验证的 Pydantic 模型类
+
+### 视觉和处理
+* `use_vision` (默认: `"auto"`): 视觉模式 - `"auto"` 包含截图工具但仅在请求时使用视觉，`True` 始终包含截图，`False` 从不包含截图并排除截图工具
+* `vision_detail_level` (默认: `'auto'`): 截图详细程度 - `'low'`, `'high'`, 或 `'auto'`
+* `page_extraction_llm`: 用于页面内容提取的单独 LLM 模型。您可以选择小型快速模型，因为它只需要从页面提取文本（默认: 与 `llm` 相同）
+### 操作和行为
+* `initial_actions`: 在主任务之前运行的操作列表，不使用 LLM
+* `max_actions_per_step` (默认: `3`): 每步最大操作数，例如在表单填写时，代理可以一次输出 3 个字段。我们执行操作直到页面改变。
+* `max_failures` (默认: `3`): 出错步骤的最大重试次数
+* `final_response_after_failure` (默认: `True`): 如果为 True，在达到 max_failures 后尝试强制一次最终的模型调用，包含中间输出
+* `use_thinking` (默认: `True`): 控制代理是否使用其内部"思考"字段进行显式推理步骤
+* `flash_mode` (默认: `False`): 快速模式，跳过评估、下一个目标和思考，仅使用记忆。如果启用了 `flash_mode`，它会覆盖 `use_thinking` 并完全禁用思考过程
+
+### 系统消息
+* `override_system_message`: 完全替换默认系统提示
+* `extend_system_message`: 向默认系统提示添加附加说明
+### 文件和数据管理
+
+* `save_conversation_path`: 保存完整对话历史的路径
+* `save_conversation_path_encoding` (默认: `'utf-8'`): 保存对话的编码
+* `available_file_paths`: 代理可以访问的文件路径列表
+* `sensitive_data`: 敏感数据字典，需要小心处理
+
+### 性能与限制
+* `max_history_items`: 保留在 LLM 记忆中的最后步骤的最大数量。如果为 `None`，我们保留所有步骤。
+* `llm_timeout` (默认: `90`): LLM 调用的超时时间（秒）
+* `step_timeout` (默认: `120`): 每步的超时时间（秒）
+* `directly_open_url` (默认: `True`): 如果我们在任务中检测到 URL，我们直接打开它
+
+## 重要注意事项
+* **不是 Playwright**: Actor 基于 CDP 构建，而不是 Playwright。API 尽可能类似 Playwright 以便于迁移，但这是一个子集。
+* **立即返回**: `get_elements_by_css_selector()` 不会等待可见性
+* **手动定时**: 您需要处理导航定时和等待
+* **JavaScript 格式**: `evaluate()` 需要箭头函数格式: `() => {}`
+
+## 最佳实践
+* 在触发导航的操作后使用 `asyncio.sleep()`
+* 检查 URL/标题变化以验证状态转换
+* 在交互前始终检查元素是否存在
+* 为不稳定的元素实现重试逻辑
+* 调用 `browser.stop()` 清理资源
+## 支持的 LLM 模型
+
+### ChatBrowserUse (推荐)
+专为浏览器自动化任务优化，平均完成任务速度比其他模型快 3-5 倍，准确度达到 SOTA 水平。
+**定价（每100万tokens）：**
+- 输入 tokens: $0.20
+- 缓存的输入 tokens: $0.02
+- 输出 tokens: $2.00
+
+```python
+from browser_use import Agent, ChatBrowserUse
+llm = ChatBrowserUse()
+agent = Agent(task="您的任务", llm=llm)
+```
+
+### OpenAI
+```python
+from browser_use import Agent, ChatOpenAI
+llm = ChatOpenAI(model="gpt-4o")
+agent = Agent(task="您的任务", llm=llm)
+```
+环境变量: `OPENAI_API_KEY`
+
+### Anthropic Claude
+```python
+from browser_use import Agent, ChatAnthropic
+llm = ChatAnthropic(model='claude-sonnet-4-20250514')
+agent = Agent(task="您的任务", llm=llm)
+```
+环境变量: `ANTHROPIC_API_KEY`
+
+### Google Gemini
+```python
+from browser_use import Agent, ChatGoogle
+llm = ChatGoogle(model="gemini-2.0-flash-exp")
+agent = Agent(task="您的任务", llm=llm)
+```
+环境变量: `GOOGLE_API_KEY`
+
+### Groq
+```python
+from browser_use import Agent, ChatGroq
+llm = ChatGroq(model="meta-llama/llama-4-maverick-17b-128e-instruct")
+agent = Agent(task="您的任务", llm=llm)
+```
+环境变量: `GROQ_API_KEY`
+
+### Ollama (本地)
+1. 安装 Ollama: https://github.com/ollama/ollama
+2. 运行 `ollama serve` 启动服务器
+3. 安装模型: `ollama pull llama3.1:8b`
+```python
+from browser_use import Agent, ChatOllama
+llm = ChatOllama(model="llama3.1:8b")
+agent = Agent(task="您的任务", llm=llm)
+```
+
+### AWS Bedrock
+```python
+from browser_use import Agent, ChatAWSBedrock
+llm = ChatAWSBedrock(
+    model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+    aws_region="us-east-1",
+)
+agent = Agent(task="您的任务", llm=llm)
+```
+环境变量: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`
+
+### 其他模型
+库支持所有可以通过 OpenAI 兼容 API 调用的模型。示例：
+- DeepSeek
+- Novita
+- OpenRouter
+- Vercel AI Gateway
+- ModelScope
+- Qwen (仅推荐 `qwen-vl-max`)
+
+## 使用规则
+1. **始终使用异步**: 所有浏览器操作都是异步的，使用 `await`
+2. **清理资源**: 始终在完成后调用 `await browser.stop()`
+3. **错误处理**: 为网络操作和元素查找实现适当的错误处理
+4. **等待导航**: 在可能触发页面导航的操作后添加适当的等待
+5. **使用类型提示**: 利用Python类型提示提高代码质量
+6. **优先使用AI功能**: 对于复杂的选择和提取任务，优先使用 `get_element_by_prompt` 和 `extract_content`
+7. **资源管理**: 使用上下文管理器或try/finally确保浏览器正确关闭
+
+## 开发环境
+- Python >= 3.11
+- 使用 `uv` 进行包管理（推荐）
+- 环境变量存储在 `.env` 文件中
+- 使用 `uvx browser-use install` 安装 Chromium
+
+## 参考文档
+- [完整文档](https://docs.browser-use.com)
+- [Agent 参数](https://docs.browser-use.com/customize/agent/all-parameters)
+- [Browser 参数](https://docs.browser-use.com/customize/browser/all-parameters)
+- [工具文档](https://docs.browser-use.com/customize/tools/available)
+- [支持的模型](https://docs.browser-use.com/supported-models)
+

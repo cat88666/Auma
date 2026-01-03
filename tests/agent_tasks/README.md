@@ -1,33 +1,26 @@
-# Contributing Agent Tasks
+# 贡献代理任务
+贡献您自己的代理任务，我们会测试代理是否能解决它们，用于 CI 测试！
 
-Contribute your own agent tasks and we test if the agent solves them for CI testing!
-
-## How to Add a Task
-
-1. Create a new `.yaml` file in this directory (`tests/agent_tasks/`).
-2. Use the following format:
+## 如何添加任务
+1. 在此目录（`tests/agent_tasks/`）中创建一个新的 `.yaml` 文件。
+2. 使用以下格式：
 
 ```yaml
-name: My Task Name
-task: Describe the task for the agent to perform
+name: 我的任务名称
+task: 描述代理要执行的任务
 judge_context:
-  - List criteria for success, one per line
+  - 列出成功标准，每行一个
 max_steps: 10
 ```
 
-## Guidelines
-- Be specific in your task and criteria.
-- The `judge_context` should list what counts as a successful result.
-- The agent's output will be judged by an LLM using these criteria.
+## 指南
+- 在任务和标准中要具体明确。
+- `judge_context` 应该列出什么算作成功的结果。
+- 代理的输出将由 LLM 使用这些标准进行评判。
 
-## Running the Tests
-
-To run all agent tasks:
-
+## 运行测试
+要运行所有代理任务：
 ```bash
 pytest tests/ci/test_agent_real_tasks.py
 ```
-
 ---
-
-Happy contributing! 

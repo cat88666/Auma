@@ -1,5 +1,5 @@
-name: Find pip install command for browser-use
-task: Find the pip installation command for the browser-use repo
+name: 查找 browser-use 的 pip 安装命令
+task: 查找 browser-use 仓库的 pip 安装命令
 judge_context:
-  - The output must include the command ('pip install browser-use') 
+  - 输出必须包含命令 ('pip install browser-use')
 max_steps: 10

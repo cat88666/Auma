@@ -1,7 +1,7 @@
-name: Amazon Laptop Search
-task: Go to amazon.com, search for 'laptop', and return the first result
+name: Amazon 笔记本电脑搜索
+task: 访问 amazon.com，搜索 'laptop'，并返回第一个结果
 judge_context:
-  - The agent must navigate to amazon.com
-  - The agent must search for 'laptop'
-  - The agent must return name of the first laptop 
+  - 代理必须导航到 amazon.com
+  - 代理必须搜索 'laptop'
+  - 代理必须返回第一个笔记本电脑的名称
 max_steps: 10
